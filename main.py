@@ -2,8 +2,9 @@ import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel, QLineEdit,
-    QComboBox, QTextEdit, QMessageBox, QHeaderView, QFormLayout, QDialog, QSlider
+    QComboBox, QTextEdit, QMessageBox, QHeaderView, QFormLayout, QDialog, QSlider, QFileDialog
 )
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from database import MovieDatabase
 

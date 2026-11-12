@@ -25,6 +25,7 @@ class MovieDatabase:
             CREATE TABLE IF NOT EXISTS movies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                poster TEXT,
                 year INTEGER,
                 rating INTEGER,
                 review TEXT,
