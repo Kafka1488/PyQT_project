@@ -104,7 +104,6 @@ class MovieApp(QMainWindow):
         form_layout.addRow("Оценка (0-10):", slider_layout)
         form_layout.addRow("Личный отзыв:", self.review_input)
 
-
         btn_layout = QHBoxLayout()
         self.save_btn = QPushButton("Добавить")
         self.save_btn.clicked.connect(self.save_movie)
@@ -185,13 +184,11 @@ class MovieApp(QMainWindow):
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-
     def update_rating_label(self, value):
         if value == 0:
             self.rating_label.setText("Нет оценки (0)")
         else:
             self.rating_label.setText(f"{value} из 10")
-
 
     def load_movies(self):
         movies = self.db.get_all_movies()
@@ -212,7 +209,7 @@ class MovieApp(QMainWindow):
         elif sort_idx == 3:  # По оценке
             movies.sort(key=lambda x: (x[3] is not None, x[3]), reverse=True)
 
-# Заполнение таблицы
+        # Заполнение таблицы
         self.table.setRowCount(0)
         for row_idx, movie in enumerate(movies):
             self.table.insertRow(row_idx)
@@ -226,7 +223,6 @@ class MovieApp(QMainWindow):
 
             rating_display = str(movie[3]) if movie[3] and movie[3] > 0 else "-"
             self.table.setItem(row_idx, 7, QTableWidgetItem(rating_display))
-
 
     def save_movie(self):
         title = self.title_input.text().strip()
@@ -255,14 +251,14 @@ class MovieApp(QMainWindow):
         if self.current_movie_id is None:
             self.db.add_movie(title, year, rating, review, category, genres, countries, directors)
         else:
-            self.db.update_movie(self.current_movie_id, title, year, rating, review, category, genres, countries, directors)
+            self.db.update_movie(self.current_movie_id, title, year, rating, review, category, genres, countries,
+                                 directors)
             self.current_movie_id = None
             self.form_title_label.setText("<b>Добавить фильм</b>")
             self.save_btn.setText("Добавить")
 
         self.clear_form()
         self.load_movies()
-
 
     def load_to_form_for_edit(self):
         selected_rows = self.table.selectionModel().selectedRows()
@@ -294,16 +290,12 @@ class MovieApp(QMainWindow):
             self.form_title_label.setText(f"<b>Редактирование (ID: {movie[0]})</b>")
             self.save_btn.setText("Сохранить")
 
-
     def open_movie_card(self, row, column):
         movie_id = int(self.table.item(row, 0).text())
         movie = self.db.get_movie_by_id(movie_id)
         if movie:
-
-
             card = MovieCardDialog(movie, self)
             card.exec()
-
 
     def delete_movie(self):
         selected_rows = self.table.selectionModel().selectedRows()
@@ -323,7 +315,6 @@ class MovieApp(QMainWindow):
             self.clear_form()
             self.load_movies()
 
-
     def clear_form(self):
         self.title_input.clear()
         self.genre_input.clear()
@@ -337,7 +328,6 @@ class MovieApp(QMainWindow):
         self.current_movie_id = None
         self.form_title_label.setText("<b>Добавить фильм</b>")
         self.save_btn.setText("Добавить")
-
 
     def closeEvent(self, event):
         self.db.close()
