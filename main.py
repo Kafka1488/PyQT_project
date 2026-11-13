@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QPushButton, QLabel, QLineEdit,
     QComboBox, QTextEdit, QMessageBox, QHeaderView, QFormLayout, QDialog, QSlider, QFileDialog
 )
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from database import MovieDatabase
 
@@ -105,6 +104,7 @@ class MovieApp(QMainWindow):
         form_layout.addRow("Личный отзыв:", self.review_input)
 
         btn_layout = QHBoxLayout()
+
         self.save_btn = QPushButton("Добавить")
         self.save_btn.clicked.connect(self.save_movie)
         self.cancel_btn = QPushButton("Очистить")
@@ -170,8 +170,12 @@ class MovieApp(QMainWindow):
         self.delete_btn = QPushButton("Удалить выбранный")
         self.delete_btn.clicked.connect(self.delete_movie)
 
+        self.import_btn = QPushButton("Импортировать из файла...")
+        self.import_btn.clicked.connect(self.import_movies_from_file)
+
         table_btn_layout.addWidget(self.edit_btn_mode)
         table_btn_layout.addWidget(self.delete_btn)
+        table_btn_layout.addWidget(self.import_btn)
         table_btn_layout.addStretch()
 
         right_layout.addLayout(table_btn_layout)
@@ -314,6 +318,96 @@ class MovieApp(QMainWindow):
                 self.db.delete_movie(movie_id)
             self.clear_form()
             self.load_movies()
+
+    def import_movies_from_file(self):
+        """Универсальный импорт с защитой от скрытых символов блокнота"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Выберите файл для импорта", "", "Текстовые файлы и таблицы (*.csv *.txt);;Все файлы (*.*)"
+        )
+        if not file_path:
+            return
+
+        added_count = 0
+        error_count = 0
+
+        # Читаем файл с utf-8-sig, чтобы убрать мусорные байты от блокнота Windows
+        try:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                lines = f.readlines()
+        except Exception:
+            try:
+                with open(file_path, 'r', encoding='cp1251') as f:
+                    lines = f.readlines()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось прочитать файл:\n{str(e)}")
+                return
+
+        if not lines:
+            QMessageBox.warning(self, "Внимание", "Файл пустой!")
+            return
+
+        start_idx = 0
+        first_line_lower = lines[0].lower()
+        if "название" in first_line_lower or "title" in first_line_lower:
+            start_idx = 1
+
+        for idx in range(start_idx, len(lines)):
+            line = lines[idx].strip()
+            if not line:
+                continue
+
+            # Разделяем по слэшу или точке с запятой
+            if '/' in line:
+                parts = [p.strip() for p in line.split('/')]
+            elif ';' in line:
+                parts = [p.strip() for p in line.split(';')]
+            else:
+                parts = [p.strip() for p in line.split(',')]
+
+            # Очищаем пустые хвостики, если строка заканчивалась слэшем
+            parts = [p for p in parts if p != '']
+
+            if len(parts) < 2:
+                error_count += 1
+                continue
+
+            title = parts[0]
+            genre_str = parts[1] if len(parts) > 1 and parts[1] else "Другое"
+
+            year = None
+            if len(parts) > 2 and parts[2].isdigit():
+                year = int(parts[2])
+
+            country_str = parts[3] if len(parts) > 3 else ""
+            director_str = parts[4] if len(parts) > 4 else ""
+
+            category = "В планах"
+            if len(parts) > 5 and parts[5] in ["В планах", "Смотрели", "Избранные", "Брошенные"]:
+                category = parts[5]
+
+            rating = None
+            if len(parts) > 6 and parts[6].isdigit():
+                r_val = int(parts[6])
+                if 0 <= r_val <= 10:
+                    rating = r_val
+
+            review = parts[7] if len(parts) > 7 else ""
+
+            try:
+                genres = [g.strip() for g in genre_str.split(",") if g.strip()]
+                countries = [c.strip() for c in country_str.split(",") if c.strip()]
+                directors = [d.strip() for d in director_str.split(",") if d.strip()]
+
+                self.db.add_movie(title, year, rating, review, category, genres, countries, directors)
+                added_count += 1
+            except Exception:
+                error_count += 1
+
+        self.load_movies()
+        QMessageBox.information(
+            self, "Импорт завершен",
+            f"Успешно добавлено фильмов: {added_count}\nПропущено строк с ошибками: {error_count}"
+        )
 
     def clear_form(self):
         self.title_input.clear()
