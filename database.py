@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime
 
-
 class MovieDatabase:
     def __init__(self, db_name="movies.db"):
         self.conn = sqlite3.connect(db_name)
@@ -93,7 +92,7 @@ class MovieDatabase:
         self.conn.commit()
         return self.cursor.lastrowid
 
-    def add_movie(self, title, year, rating, review, category_name, genres, countries, directors):
+    def add_movie(self, title, poster, year, rating, review, category_name, genres, countries, directors):
         date_added = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         self.cursor.execute("SELECT id FROM categories WHERE name = ?", (category_name,))
@@ -101,10 +100,9 @@ class MovieDatabase:
         cat_id = cat_row[0] if cat_row else None
 
         self.cursor.execute("""
-            INSERT INTO movies (title, year, rating, review, category_id, date_added)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (title, year, rating, review, cat_id, date_added))
-
+            INSERT INTO movies (title, poster, year, rating, review, category_id, date_added)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (title, poster, year, rating, review, cat_id, date_added))
 
         movie_id = self.cursor.lastrowid
 
@@ -127,16 +125,15 @@ class MovieDatabase:
 
         self.conn.commit()
 
-
-    def update_movie(self, movie_id, title, year, rating, review, category_name, genres, countries, directors):
+    def update_movie(self, movie_id, title, poster, year, rating, review, category_name, genres, countries, directors):
         self.cursor.execute("SELECT id FROM categories WHERE name = ?", (category_name,))
         cat_row = self.cursor.fetchone()
         cat_id = cat_row[0] if cat_row else None
 
         self.cursor.execute("""
-                UPDATE movies SET title=?, year=?, rating=?, review=?, category_id=?
+                UPDATE movies SET title=?, poster=?, year=?, rating=?, review=?, category_id=?
                 WHERE id=?
-            """, (title, year, rating, review, cat_id, movie_id))
+            """, (title, poster, year, rating, review, cat_id, movie_id))
 
         self.cursor.execute("DELETE FROM movie_genres WHERE movie_id = ?", (movie_id,))
         self.cursor.execute("DELETE FROM movie_countries WHERE movie_id = ?", (movie_id,))
@@ -162,16 +159,14 @@ class MovieDatabase:
 
         self.conn.commit()
 
-
     def delete_movie(self, movie_id):
         self.cursor.execute("DELETE FROM movies WHERE id = ?", (movie_id,))
         self.conn.commit()
 
-
     def get_all_movies(self):
         query = """
                 SELECT 
-                    m.id, m.title, m.year, m.rating, m.review, c.name, m.date_added,
+                    m.id, m.title, m.poster, m.year, m.rating, m.review, c.name, m.date_added,
                     GROUP_CONCAT(DISTINCT g.name) AS genres,
                     GROUP_CONCAT(DISTINCT co.name) AS countries,
                     GROUP_CONCAT(DISTINCT d.name) AS directors
@@ -188,11 +183,10 @@ class MovieDatabase:
         self.cursor.execute(query)
         return self.cursor.fetchall()
 
-
     def get_movie_by_id(self, movie_id):
         query = """
                 SELECT 
-                    m.id, m.title, m.year, m.rating, m.review, c.name, m.date_added,
+                    m.id, m.title, m.poster, m.year, m.rating, m.review, c.name, m.date_added,
                     GROUP_CONCAT(DISTINCT g.name) AS genres,
                     GROUP_CONCAT(DISTINCT co.name) AS countries,
                     GROUP_CONCAT(DISTINCT d.name) AS directors
@@ -209,7 +203,6 @@ class MovieDatabase:
             """
         self.cursor.execute(query, (movie_id,))
         return self.cursor.fetchone()
-
 
     def close(self):
         self.conn.close()

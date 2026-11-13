@@ -1,9 +1,11 @@
 import sys
+import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel, QLineEdit,
     QComboBox, QTextEdit, QMessageBox, QHeaderView, QFormLayout, QDialog, QSlider, QFileDialog
 )
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from database import MovieDatabase
 
@@ -14,23 +16,45 @@ class MovieCardDialog(QDialog):
     def __init__(self, movie_data, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Карточка: {movie_data[1]}")
-        self.resize(450, 420)
+        self.resize(500, 420)
 
+        main_layout = QHBoxLayout()
+
+        # Левая часть: Постер
+        poster_layout = QVBoxLayout()
+        self.poster_label = QLabel("Нет постера")
+        self.poster_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.poster_label.setFixedSize(140, 180)
+        self.poster_label.setStyleSheet("border: 1px solid gray; background-color: #222; color: #aaa;")
+
+        poster_path = movie_data[2]
+        if poster_path and os.path.exists(poster_path):
+            pixmap = QPixmap(poster_path)
+            if not pixmap.isNull():
+                self.poster_label.setPixmap(
+                    pixmap.scaled(140, 180, Qt.AspectRatioMode.KeepAspectRatio,
+                                  Qt.TransformationMode.SmoothTransformation)
+                )
+
+        poster_layout.addWidget(self.poster_label)
+        poster_layout.addStretch()
+        main_layout.addLayout(poster_layout)
+
+        # Правая часть: Данные
         layout = QFormLayout()
-
         layout.addRow("<b>Название:</b>", QLabel(str(movie_data[1])))
-        layout.addRow("<b>Год:</b>", QLabel(str(movie_data[2] or "-")))
-        layout.addRow("<b>Жанр(ы):</b>", QLabel(str(movie_data[7] or "-")))
-        layout.addRow("<b>Страна/ы:</b>", QLabel(str(movie_data[8] or "-")))
-        layout.addRow("<b>Режиссёр/ы:</b>", QLabel(str(movie_data[9] or "-")))
-        layout.addRow("<b>Категория:</b>", QLabel(str(movie_data[5] or "-")))
+        layout.addRow("<b>Год:</b>", QLabel(str(movie_data[3] or "-")))
+        layout.addRow("<b>Жанр(ы):</b>", QLabel(str(movie_data[8] or "-")))
+        layout.addRow("<b>Страна/ы:</b>", QLabel(str(movie_data[9] or "-")))
+        layout.addRow("<b>Режиссёр/ы:</b>", QLabel(str(movie_data[10] or "-")))
+        layout.addRow("<b>Категория:</b>", QLabel(str(movie_data[6] or "-")))
 
-        rating_val = f"{movie_data[3]} / 10" if movie_data[3] and movie_data[3] > 0 else "Нет оценки"
+        rating_val = f"{movie_data[4]} / 10" if movie_data[4] and movie_data[4] > 0 else "Нет оценки"
         layout.addRow("<b>Оценка:</b>", QLabel(rating_val))
-        layout.addRow("<b>Дата добавления:</b>", QLabel(str(movie_data[6])))
+        layout.addRow("<b>Дата добавления:</b>", QLabel(str(movie_data[7])))
 
         review_label = QTextEdit()
-        review_label.setText(movie_data[4] or "Отзыва нет")
+        review_label.setText(movie_data[5] or "Отзыва нет")
         review_label.setReadOnly(True)
         layout.addRow("<b>Личный отзыв:</b>", review_label)
 
@@ -38,7 +62,8 @@ class MovieCardDialog(QDialog):
         close_btn.clicked.connect(self.accept)
         layout.addRow(close_btn)
 
-        self.setLayout(layout)
+        main_layout.addLayout(layout)
+        self.setLayout(main_layout)
 
 
 class MovieApp(QMainWindow):
@@ -46,6 +71,7 @@ class MovieApp(QMainWindow):
         super().__init__()
         self.db = MovieDatabase()
         self.current_movie_id = None
+        self.cover_path = None
 
         self.setWindowTitle("Каталог фильмов — Фильмотека")
         self.resize(1100, 650)
@@ -56,7 +82,6 @@ class MovieApp(QMainWindow):
     def init_ui(self):
         main_layout = QHBoxLayout()
 
-        # --- Левая панель: Форма добавления/редактирования ---
         form_widget = QWidget()
         form_layout = QFormLayout()
 
@@ -76,6 +101,20 @@ class MovieApp(QMainWindow):
 
         self.category_combo = QComboBox()
         self.category_combo.addItems(["В планах", "Смотрели", "Избранные", "Брошенные"])
+
+        # Виджеты для постера
+        self.CoverLabel = QLabel("Постер не выбран")
+        self.CoverLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.CoverLabel.setFixedSize(140, 180)
+        self.CoverLabel.setStyleSheet("border: 1px solid gray; background-color: #222; color: #aaa;")
+
+        self.poster_btn_layout = QHBoxLayout()
+        self.btn_load_movie_poster = QPushButton("Выбрать")
+        self.btn_load_movie_poster.clicked.connect(self.load_movie_poster)
+        self.btn_clear_poster = QPushButton("Очистить")
+        self.btn_clear_poster.clicked.connect(self.clear_poster)
+        self.poster_btn_layout.addWidget(self.btn_load_movie_poster)
+        self.poster_btn_layout.addWidget(self.btn_clear_poster)
 
         # Слайдер для оценки (0 - 10)
         slider_layout = QHBoxLayout()
@@ -100,11 +139,12 @@ class MovieApp(QMainWindow):
         form_layout.addRow("Страна/ы:", self.country_input)
         form_layout.addRow("Режиссёр/ы:", self.director_input)
         form_layout.addRow("Категория:", self.category_combo)
+        form_layout.addRow("Постер:", self.CoverLabel)
+        form_layout.addRow("", self.poster_btn_layout)
         form_layout.addRow("Оценка (0-10):", slider_layout)
         form_layout.addRow("Личный отзыв:", self.review_input)
 
         btn_layout = QHBoxLayout()
-
         self.save_btn = QPushButton("Добавить")
         self.save_btn.clicked.connect(self.save_movie)
         self.cancel_btn = QPushButton("Очистить")
@@ -115,16 +155,13 @@ class MovieApp(QMainWindow):
         form_layout.addRow(btn_layout)
 
         form_widget.setLayout(form_layout)
-        form_widget.setFixedWidth(360)
+        form_widget.setFixedWidth(380)
 
-        # --- Правая панель: Управление фильтрами, сортировкой и таблица ---
+        # Правая панель (Таблица и фильтры)
         right_widget = QWidget()
         right_layout = QVBoxLayout()
 
-        # Панель переключателей (Категории + Сортировка)
         controls_layout = QHBoxLayout()
-
-        # 1. Выбор категории (Смотрели, Избранные, В планах, Брошенные)
         controls_layout.addWidget(QLabel("Категория:"))
         self.filter_category = QComboBox()
         self.filter_category.addItems(["Все", "В планах", "Смотрели", "Избранные", "Брошенные"])
@@ -133,7 +170,6 @@ class MovieApp(QMainWindow):
 
         controls_layout.addSpacing(20)
 
-        # 2. Сортировка (по алфавиту, дате, году, оценке и т.д.)
         controls_layout.addWidget(QLabel("Сортировка:"))
         self.sort_combo = QComboBox()
         self.sort_combo.addItems([
@@ -148,7 +184,6 @@ class MovieApp(QMainWindow):
         controls_layout.addStretch()
         right_layout.addLayout(controls_layout)
 
-        # Таблица фильмов
         self.table = QTableWidget()
         self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels([
@@ -162,7 +197,6 @@ class MovieApp(QMainWindow):
 
         right_layout.addWidget(self.table)
 
-        # Кнопки управления таблицей
         table_btn_layout = QHBoxLayout()
         self.edit_btn_mode = QPushButton("Редактировать выбранный")
         self.edit_btn_mode.clicked.connect(self.load_to_form_for_edit)
@@ -197,35 +231,32 @@ class MovieApp(QMainWindow):
     def load_movies(self):
         movies = self.db.get_all_movies()
 
-        # 1. Фильтрация по выбранной категории («Все», «В планах», «Избранные» и т.д.)
         selected_category = self.filter_category.currentText()
         if selected_category != "Все":
-            movies = [m for m in movies if m[5] == selected_category]
+            movies = [m for m in movies if m[6] == selected_category]
 
-        # 2. Сортировка (Алфавит, дата добавления, год, оценка)
         sort_idx = self.sort_combo.currentIndex()
-        if sort_idx == 0:  # По алфавиту
+        if sort_idx == 0:
             movies.sort(key=lambda x: x[1].lower())
-        elif sort_idx == 1:  # По дате добавления
-            movies.sort(key=lambda x: x[6], reverse=True)
-        elif sort_idx == 2:  # По году
-            movies.sort(key=lambda x: (x[2] is not None, x[2]), reverse=True)
-        elif sort_idx == 3:  # По оценке
+        elif sort_idx == 1:
+            movies.sort(key=lambda x: x[7], reverse=True)
+        elif sort_idx == 2:
             movies.sort(key=lambda x: (x[3] is not None, x[3]), reverse=True)
+        elif sort_idx == 3:
+            movies.sort(key=lambda x: (x[4] is not None, x[4]), reverse=True)
 
-        # Заполнение таблицы
         self.table.setRowCount(0)
         for row_idx, movie in enumerate(movies):
             self.table.insertRow(row_idx)
             self.table.setItem(row_idx, 0, QTableWidgetItem(str(movie[0])))
             self.table.setItem(row_idx, 1, QTableWidgetItem(movie[1]))
-            self.table.setItem(row_idx, 2, QTableWidgetItem(str(movie[2]) if movie[2] else ""))
-            self.table.setItem(row_idx, 3, QTableWidgetItem(movie[7] or ""))
-            self.table.setItem(row_idx, 4, QTableWidgetItem(movie[8] or ""))
-            self.table.setItem(row_idx, 5, QTableWidgetItem(movie[9] or ""))
-            self.table.setItem(row_idx, 6, QTableWidgetItem(movie[5] or ""))
+            self.table.setItem(row_idx, 2, QTableWidgetItem(str(movie[3]) if movie[3] else ""))
+            self.table.setItem(row_idx, 3, QTableWidgetItem(movie[8] or ""))
+            self.table.setItem(row_idx, 4, QTableWidgetItem(movie[9] or ""))
+            self.table.setItem(row_idx, 5, QTableWidgetItem(movie[10] or ""))
+            self.table.setItem(row_idx, 6, QTableWidgetItem(movie[6] or ""))
 
-            rating_display = str(movie[3]) if movie[3] and movie[3] > 0 else "-"
+            rating_display = str(movie[4]) if movie[4] and movie[4] > 0 else "-"
             self.table.setItem(row_idx, 7, QTableWidgetItem(rating_display))
 
     def save_movie(self):
@@ -241,8 +272,8 @@ class MovieApp(QMainWindow):
             rating = None
 
         review = self.review_input.toPlainText().strip()
+        poster = self.cover_path
 
-        # Валидация
         if not title or not genre_str:
             QMessageBox.warning(self, "Ошибка", "Заполните обязательные поля: «Название» и «Жанр(ы)»!")
             return
@@ -253,10 +284,10 @@ class MovieApp(QMainWindow):
         directors = [d.strip() for d in director_str.split(",") if d.strip()]
 
         if self.current_movie_id is None:
-            self.db.add_movie(title, year, rating, review, category, genres, countries, directors)
+            self.db.add_movie(title, poster, year, rating, review, category, genres, countries, directors)
         else:
-            self.db.update_movie(self.current_movie_id, title, year, rating, review, category, genres, countries,
-                                 directors)
+            self.db.update_movie(self.current_movie_id, title, poster, year, rating, review, category, genres,
+                                 countries, directors)
             self.current_movie_id = None
             self.form_title_label.setText("<b>Добавить фильм</b>")
             self.save_btn.setText("Добавить")
@@ -277,19 +308,32 @@ class MovieApp(QMainWindow):
         if movie:
             self.current_movie_id = movie[0]
             self.title_input.setText(movie[1])
-            self.year_input.setText(str(movie[2]) if movie[2] else "")
-            self.genre_input.setText(movie[7] or "")
-            self.country_input.setText(movie[8] or "")
-            self.director_input.setText(movie[9] or "")
+            self.year_input.setText(str(movie[3]) if movie[3] else "")
+            self.genre_input.setText(movie[8] or "")
+            self.country_input.setText(movie[9] or "")
+            self.director_input.setText(movie[10] or "")
 
-            cat_index = self.category_combo.findText(movie[5])
+            cat_index = self.category_combo.findText(movie[6])
             if cat_index >= 0:
                 self.category_combo.setCurrentIndex(cat_index)
 
-            rating_val = movie[3] if movie[3] else 0
+            rating_val = movie[4] if movie[4] else 0
             self.rating_slider.setValue(rating_val)
 
-            self.review_input.setText(movie[4] or "")
+            self.review_input.setText(movie[5] or "")
+
+            # Загружаем постер при редактировании
+            self.cover_path = movie[2]
+            if self.cover_path and os.path.exists(self.cover_path):
+                pixmap = QPixmap(self.cover_path)
+                if not pixmap.isNull():
+                    self.CoverLabel.setPixmap(
+                        pixmap.scaled(140, 180, Qt.AspectRatioMode.KeepAspectRatio,
+                                      Qt.TransformationMode.SmoothTransformation)
+                    )
+            else:
+                self.CoverLabel.clear()
+                self.CoverLabel.setText("Постер не выбран")
 
             self.form_title_label.setText(f"<b>Редактирование (ID: {movie[0]})</b>")
             self.save_btn.setText("Сохранить")
@@ -320,7 +364,6 @@ class MovieApp(QMainWindow):
             self.load_movies()
 
     def import_movies_from_file(self):
-        """Универсальный импорт с защитой от скрытых символов блокнота"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Выберите файл для импорта", "", "Текстовые файлы и таблицы (*.csv *.txt);;Все файлы (*.*)"
         )
@@ -330,7 +373,6 @@ class MovieApp(QMainWindow):
         added_count = 0
         error_count = 0
 
-        # Читаем файл с utf-8-sig, чтобы убрать мусорные байты от блокнота Windows
         try:
             with open(file_path, 'r', encoding='utf-8-sig') as f:
                 lines = f.readlines()
@@ -356,7 +398,6 @@ class MovieApp(QMainWindow):
             if not line:
                 continue
 
-            # Разделяем по слэшу или точке с запятой
             if '/' in line:
                 parts = [p.strip() for p in line.split('/')]
             elif ';' in line:
@@ -364,7 +405,6 @@ class MovieApp(QMainWindow):
             else:
                 parts = [p.strip() for p in line.split(',')]
 
-            # Очищаем пустые хвостики, если строка заканчивалась слэшем
             parts = [p for p in parts if p != '']
 
             if len(parts) < 2:
@@ -398,7 +438,7 @@ class MovieApp(QMainWindow):
                 countries = [c.strip() for c in country_str.split(",") if c.strip()]
                 directors = [d.strip() for d in director_str.split(",") if d.strip()]
 
-                self.db.add_movie(title, year, rating, review, category, genres, countries, directors)
+                self.db.add_movie(title, None, year, rating, review, category, genres, countries, directors)
                 added_count += 1
             except Exception:
                 error_count += 1
@@ -409,6 +449,28 @@ class MovieApp(QMainWindow):
             f"Успешно добавлено фильмов: {added_count}\nПропущено строк с ошибками: {error_count}"
         )
 
+    def load_movie_poster(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Выберите постер", "", "Изображения (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+        )
+        if not path:
+            return
+
+        pixmap = QPixmap(path)
+        if pixmap.isNull():
+            QMessageBox.warning(self, "Ошибка", "Не удалось открыть изображение")
+            return
+
+        self.cover_path = os.path.abspath(path)
+        self.CoverLabel.setPixmap(
+            pixmap.scaled(140, 180, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        )
+
+    def clear_poster(self):
+        self.cover_path = None
+        self.CoverLabel.clear()
+        self.CoverLabel.setText("Постер не выбран")
+
     def clear_form(self):
         self.title_input.clear()
         self.genre_input.clear()
@@ -418,6 +480,7 @@ class MovieApp(QMainWindow):
         self.category_combo.setCurrentIndex(0)
         self.rating_slider.setValue(0)
         self.review_input.clear()
+        self.clear_poster()
 
         self.current_movie_id = None
         self.form_title_label.setText("<b>Добавить фильм</b>")
